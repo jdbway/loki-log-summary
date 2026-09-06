@@ -1,0 +1,40 @@
+{
+  "active": "local",
+  "profiles": {
+    "local": {
+      "provider": "ollama",
+      "base_url": "http://192.168.5.50:11434/",
+      "model": "qwen2.5:7b",
+      "max_analysis_lines": 30,
+      "max_prompt_chars": 6000,
+      "max_output_tokens": 160
+    },
+    "openrouter": {
+      "provider": "openai_compatible",
+      "base_url": "https://openrouter.ai/api/v1",
+      "model": "openai/gpt-4o-mini",
+      "api_key_file": "/run/secrets/llm_api_key",
+      "max_analysis_lines": 200,
+      "max_prompt_chars": 30000,
+      "max_output_tokens": 512
+    },
+    "openai": {
+      "provider": "openai_compatible",
+      "base_url": "https://api.openai.com/v1",
+      "model": "gpt-4o-mini",
+      "api_key_file": "/run/secrets/llm_api_key",
+      "max_analysis_lines": 200,
+      "max_prompt_chars": 30000,
+      "max_output_tokens": 512
+    },
+    "opencode-go": {
+      "provider": "openai_compatible",
+      "base_url": "https://REPLACE_WITH_OPENCODE_GO_ENDPOINT/v1",
+      "model": "REPLACE_WITH_OPENCODE_GO_MODEL",
+      "api_key_file": "/run/secrets/llm_api_key",
+      "max_analysis_lines": 200,
+      "max_prompt_chars": 30000,
+      "max_output_tokens": 512
+    }
+  }
+}
