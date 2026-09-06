@@ -43,8 +43,8 @@ class Config:
     lookback_seconds: int = env_int("INITIAL_LOOKBACK_SECONDS", 30, 1)
     overlap_seconds: int = env_int("QUERY_OVERLAP_SECONDS", 2, 0)
     loki_limit: int = env_int("LOKI_LIMIT", 5000, 100)
-    max_analysis_lines: int = env_int("MAX_ANALYSIS_LINES", 80, 20)
-    max_prompt_chars: int = env_int("MAX_PROMPT_CHARS", 12000, 2000)
+    max_analysis_lines: int = env_int("MAX_ANALYSIS_LINES", 30, 10)
+    max_prompt_chars: int = env_int("MAX_PROMPT_CHARS", 6000, 1000)
     max_pending_lines: int = env_int("MAX_PENDING_LINES", 5000, 100)
     ollama_timeout_seconds: int = env_int("OLLAMA_TIMEOUT_SECONDS", 120, 10)
     http_port: int = env_int("HTTP_PORT", 8080, 1)
@@ -258,7 +258,7 @@ Representative log entries follow:
             "prompt": prompt,
             "stream": False,
             "format": "json",
-            "options": {"temperature": 0.1},
+            "options": {"temperature": 0.1, "num_predict": 160},
         },
         timeout=config.ollama_timeout_seconds,
     )
