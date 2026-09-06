@@ -16,7 +16,7 @@ The Compose stack defaults to:
 Override these values in the Compose environment rather than changing the
 application. Important settings include `OLLAMA_URL`, `OLLAMA_MODEL`,
 `ANALYSIS_INTERVAL_SECONDS`, `QUIET_PERIOD_SECONDS`, `INPUT_QUERY`,
-`MAX_ANALYSIS_LINES`, and `STATE_PATH`.
+`MAX_ANALYSIS_LINES`, `MAX_PROMPT_CHARS`, and `STATE_PATH`.
 
 The sidecar uses `query_range` with a persistent SQLite cursor and a small
 overlap window. Duplicate entries are discarded using a fingerprint of the
