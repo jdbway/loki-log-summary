@@ -42,7 +42,7 @@ class Config:
     quiet_period_seconds: int = env_int("QUIET_PERIOD_SECONDS", 8, 1)
     lookback_seconds: int = env_int("INITIAL_LOOKBACK_SECONDS", 30, 1)
     overlap_seconds: int = env_int("QUERY_OVERLAP_SECONDS", 2, 0)
-    loki_limit: int = env_int("LOKI_LIMIT", 10000, 100)
+    loki_limit: int = env_int("LOKI_LIMIT", 5000, 100)
     max_analysis_lines: int = env_int("MAX_ANALYSIS_LINES", 250, 20)
     max_pending_lines: int = env_int("MAX_PENDING_LINES", 5000, 100)
     ollama_timeout_seconds: int = env_int("OLLAMA_TIMEOUT_SECONDS", 120, 10)
