@@ -10,7 +10,6 @@ import re
 import sqlite3
 import threading
 import time
-from collections import Counter
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
@@ -22,16 +21,6 @@ from urllib.request import Request, urlopen
 def env_int(name: str, default: int, minimum: int | None = None) -> int:
     try:
         value = int(os.getenv(name, str(default)))
-    except ValueError:
-        value = default
-    if minimum is not None:
-        value = max(value, minimum)
-    return value
-
-
-def env_float(name: str, default: float, minimum: float | None = None) -> float:
-    try:
-        value = float(os.getenv(name, str(default)))
     except ValueError:
         value = default
     if minimum is not None:
