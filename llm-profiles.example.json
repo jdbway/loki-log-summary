@@ -27,6 +27,15 @@
       "max_prompt_chars": 30000,
       "max_output_tokens": 512
     },
+    "claude": {
+      "provider": "anthropic",
+      "base_url": "https://api.anthropic.com/v1",
+      "model": "claude-sonnet-5",
+      "api_key_file": "/run/secrets/anthropic_api_key",
+      "max_analysis_lines": 200,
+      "max_prompt_chars": 30000,
+      "max_output_tokens": 4096
+    },
     "opencode-go": {
       "provider": "openai_compatible",
       "base_url": "https://REPLACE_WITH_OPENCODE_GO_ENDPOINT/v1",

@@ -26,6 +26,11 @@ application. Important settings include `LLM_PROVIDER`, `LLM_BASE_URL`,
 providers without changing the analyzer. Keep API keys in a mounted secret
 file and point `LLM_API_KEY_FILE` at it.
 
+`LLM_PROVIDER=anthropic` uses Anthropic's `/v1/messages` endpoint. Set
+`LLM_API_KEY_FILE` to a mounted secret and select the desired model in the
+provider profile. The fleet-report deployment uses the `claude` profile when
+`REPORT_LLM_PROFILE` is not overridden.
+
 The local Ollama profile intentionally uses smaller prompt and output defaults
 for the available 4k context. OpenAI-compatible profiles use larger defaults,
 and all three limits remain explicit overrides so a capable model can receive
@@ -74,3 +79,20 @@ require relabeling historical logs.
 No pre-labeling in Grafana is required. Labels are assigned by Alloy at
 ingestion; the current live labels (`host`, `job`, `container`, and
 `service_name`) are sufficient for the first version.
+
+## Fleet Reports
+
+The same image also contains a separate scheduled report worker. Run it with
+`python /app/report.py`; it does not share the continuous analyzer's process or
+state database. It writes `latest.html`, dated HTML reports,
+`latest-summary.json` (the Home Assistant-compatible contract), and
+`latest-report.json` to `REPORT_DIR`.
+
+Important report settings are `REPORT_SCHEDULE` (comma-separated `HH:MM` local
+times), `REPORT_TIMEZONE`, `REPORT_LOOKBACK_HOURS`,
+`REPORT_SCHEDULE_ENABLED`, `REPORT_ALERT_THRESHOLD` (`critical`, `high`,
+`medium`, or `low`), and `REPORT_RUN_ON_START`. The worker persists completed
+schedule slots in `REPORT_STATE_PATH`, so a missed scheduled run is performed
+once after restart. `POST /run?hours=4&label=Manual` requires the bearer token
+from `REPORT_TRIGGER_TOKEN_FILE` and is served alongside the reports. The
+custom app icon is available at `/icon.svg`.

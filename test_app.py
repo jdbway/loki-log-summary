@@ -1,11 +1,78 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from app import LogEntry, active_llm_settings, collapse_repeats, extract_json, select_entries, Config
+from app import (
+    Config,
+    LLMSettings,
+    LogEntry,
+    active_llm_settings,
+    collapse_repeats,
+    extract_json,
+    request_llm,
+    select_entries,
+)
+from report import analyze, failed_report, normalize_report, schedule_times
 
 
 class AppTests(unittest.TestCase):
+    def test_anthropic_request_uses_messages_api(self):
+        settings = LLMSettings(
+            name="claude",
+            provider="anthropic",
+            base_url="https://api.anthropic.com/v1",
+            model="claude-sonnet-5",
+            api_key="test-key",
+            api_key_file="",
+            api_key_env="",
+            max_analysis_lines=20,
+            max_prompt_chars=1000,
+            max_output_tokens=100,
+            timeout_seconds=30,
+        )
+        with patch("app.request_json", return_value={"content": [{"type": "text", "text": "{}"}]}) as request:
+            self.assertEqual(request_llm(settings, "prompt"), "{}")
+        request.assert_called_once()
+        self.assertEqual(request.call_args.args[0], "https://api.anthropic.com/v1/messages")
+        self.assertEqual(request.call_args.kwargs["extra_headers"]["x-api-key"], "test-key")
+        self.assertEqual(request.call_args.kwargs["payload"]["model"], "claude-sonnet-5")
+
+    def test_schedule_times_are_validated_and_sorted(self):
+        self.assertEqual(schedule_times("20:00,12:00,invalid,12:00,25:00"), [(12, 0), (20, 0)])
+
+    def test_report_counts_are_derived_from_findings(self):
+        report = normalize_report({"headline": "degraded", "findings": [
+            {"severity": "critical", "title": "Outage"},
+            {"severity": "invalid", "title": "Noise"},
+        ]}, [])
+        self.assertEqual(report["counts"], {"critical": 1, "high": 0, "medium": 0, "low": 1})
+
+    def test_report_preserves_string_findings_from_llm(self):
+        report = normalize_report({"findings": ["Prowlarr returned 401 Unauthorized", "Refresh the API key"]}, [])
+        self.assertEqual(report["counts"]["medium"], 1)
+        self.assertIn("Prowlarr", report["findings"][0]["title"])
+
+    def test_report_rejects_truncated_llm_json(self):
+        config = Config(llm_config_path="/does/not/exist")
+        entries = [LogEntry(1, {"host": "nixos"}, "error evidence")]
+        with patch("report.request_llm", return_value='{"headline":"incomplete"'):
+            with self.assertRaisesRegex(ValueError, "invalid or truncated JSON"):
+                analyze(config, entries)
+
+    def test_failed_report_is_not_presented_as_healthy(self):
+        with TemporaryDirectory() as directory:
+            with patch("report.ReportConfig.report_dir", Path(directory)):
+                summary = failed_report(
+                    "Test",
+                    __import__("datetime").datetime(2026, 1, 1),
+                    ValueError("invalid or truncated JSON"),
+                    16,
+                    [LogEntry(1, {"host": "nixos"}, "error evidence")],
+                )
+            self.assertEqual(summary["counts"]["critical"], 1)
+            self.assertIn("unavailable", summary["headline"])
+
     def test_active_profile_overrides_environment_defaults(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "profiles.json"
