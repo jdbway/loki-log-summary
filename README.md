@@ -18,7 +18,42 @@ Override these values in the Compose environment rather than changing the
 application. Important settings include `LLM_PROVIDER`, `LLM_BASE_URL`,
 `LLM_MODEL`, `LLM_API_KEY_FILE`, `ANALYSIS_INTERVAL_SECONDS`,
 `QUIET_PERIOD_SECONDS`, `INPUT_QUERY`, `MAX_ANALYSIS_LINES`,
-`MAX_PROMPT_CHARS`, `LLM_MAX_OUTPUT_TOKENS`, and `STATE_PATH`.
+`MAX_PROMPT_CHARS`, `LLM_MAX_OUTPUT_TOKENS`, `STATE_PATH`, and
+`REDACT_EVIDENCE`.
+
+## Evidence redaction
+
+Reports are useful because they quote real log lines, and real log lines carry
+credentials — a bearer token a service logged on error, a connection string with
+its password, an API key echoed by a failing health check. All of it would
+otherwise go to whichever provider the active profile names.
+
+`redact.py` scrubs every prompt before it is sent, and it is on by default. Set
+`REDACT_EVIDENCE=0` to disable (not recommended for a hosted provider).
+
+It does two different things, deliberately:
+
+- **Secrets are dropped.** Tokens, keys, passwords, JWTs, PEM blocks and
+  anything named like a credential become `[[REDACTED-<kind>]]`. Nothing is
+  learned from knowing a token recurred, so nothing is lost.
+- **Identifiers are pseudonymized, not blanked.** Hosts, IPs, emails, MACs and
+  container ids become stable names (`HOST_A`, `IP_3`) that stay consistent
+  across the whole prompt. This is what keeps the report as good as it was: log
+  analysis is correlation, and the model still sees that the same host appears
+  in two streams four seconds apart. Blanket `[REDACTED]` would destroy exactly
+  the signal it is being asked to find.
+
+The mapping never leaves the process, and the model's answer is mapped back
+before the report is written, so a human still reads real hostnames.
+
+Host names are harvested from the Loki stream labels, so there is nothing to
+configure and nothing deployment-specific in this repo. Deployment-tuned scoring
+rules live in `TUNED_RULES` and pass through the same redactor as the evidence,
+so a rule that names a host keeps matching it.
+
+Redaction is code rather than a model instruction on purpose: a model told to
+"remove anything sensitive" is a model you are trusting with the thing you are
+protecting, and a miss is silent.
 
 `LLM_PROVIDER=ollama` uses Ollama's `/api/generate` endpoint. Set
 `LLM_PROVIDER=openai_compatible` or `openrouter` to use an OpenAI-compatible

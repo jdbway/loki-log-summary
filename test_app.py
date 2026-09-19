@@ -13,7 +13,7 @@ from app import (
     request_llm,
     select_entries,
 )
-from report import analyze, failed_report, normalize_report, schedule_times
+from report import analyze, failed_report, normalize_report, render_entries, schedule_times
 
 
 class AppTests(unittest.TestCase):
@@ -114,3 +114,74 @@ class AppTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RedactionTests(unittest.TestCase):
+    """The provider must never see a credential, and the report must not degrade."""
+
+    def _entries(self):
+        return [
+            LogEntry(1_700_000_000_000_000_000, {"host": "docker-pve3", "container": "grafana"},
+                     "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcDEF123ghi"),
+            LogEntry(1_700_000_001_000_000_000, {"host": "docker-pve3", "container": "loki"},
+                     "connect 192.168.5.24:3100 refused"),
+            LogEntry(1_700_000_002_000_000_000, {"host": "GNS-v2", "unit": "gns3.service"},
+                     "gns3.service failed: stale bind IP 192.168.5.17"),
+        ]
+
+    def test_secrets_never_reach_the_prompt(self):
+        from redact import Redactor
+        entries = self._entries()
+        redactor = Redactor.from_entries(entries)
+        scrubbed = redactor.scrub(render_entries(collapse_repeats(entries)))
+        self.assertNotIn("eyJhbGciOiJIUzI1NiJ9", scrubbed)
+        self.assertNotIn("192.168.5.24", scrubbed)
+        self.assertEqual(redactor.residual_risks(scrubbed), [])
+
+    def test_pseudonyms_are_stable_so_correlation_survives(self):
+        from redact import Redactor
+        entries = self._entries()
+        redactor = Redactor.from_entries(entries)
+        scrubbed = redactor.scrub(render_entries(collapse_repeats(entries)))
+        # docker-pve3 appears on two lines; both must carry the SAME placeholder,
+        # or the model loses the only signal that links them.
+        host_token = redactor.maps["host"]["docker-pve3"]
+        self.assertEqual(scrubbed.count(host_token), 2)
+        self.assertNotEqual(host_token, redactor.maps["host"]["GNS-v2"])
+        # Error text is untouched - the report is only as good as what survives.
+        self.assertIn("refused", scrubbed)
+        self.assertIn("gns3.service failed", scrubbed)
+
+    def test_tuned_rules_share_the_evidence_pseudonyms(self):
+        from redact import Redactor
+        from report import TUNED_RULES
+        entries = self._entries()
+        redactor = Redactor.from_entries(entries)
+        evidence = redactor.scrub(render_entries(collapse_repeats(entries)))
+        rules = redactor.scrub(TUNED_RULES)
+        # The GNS-v2 rule must name the same placeholder the evidence uses,
+        # otherwise the rule silently stops matching anything.
+        token = redactor.maps["host"]["GNS-v2"]
+        self.assertIn(token, rules)
+        self.assertIn(token, evidence)
+        self.assertNotIn("GNS-v2", rules)
+
+    def test_response_is_restored_to_real_names(self):
+        from redact import Redactor
+        entries = self._entries()
+        redactor = Redactor.from_entries(entries)
+        redactor.scrub(render_entries(collapse_repeats(entries)))
+        token = redactor.maps["host"]["docker-pve3"]
+        restored = redactor.restore_obj(
+            {"headline": f"{token} is unhealthy",
+             "findings": [{"host": token, "evidence": [f"{token} refused"]}]})
+        self.assertEqual(restored["headline"], "docker-pve3 is unhealthy")
+        self.assertEqual(restored["findings"][0]["host"], "docker-pve3")
+        self.assertEqual(restored["findings"][0]["evidence"], ["docker-pve3 refused"])
+
+    def test_disabled_is_a_passthrough(self):
+        from redact import Redactor
+        redactor = Redactor.from_entries(self._entries(), enabled=False)
+        text = "token=hunter2 on 192.168.5.24"
+        self.assertEqual(redactor.scrub(text), text)
+        self.assertEqual(redactor.restore(text), text)
